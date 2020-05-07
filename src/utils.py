@@ -1,7 +1,7 @@
 import glob
 import cv2
 import numpy as np
-
+import pickle
 from constants import DATA_PATH, PATTERN_SIZE, SQUARE_SIZE, CORNER_PATH
 
 
@@ -27,8 +27,8 @@ def get_correspondence():
         if retval:
             corners = corners.reshape(-1, 2)  # image coordinmate
             ec = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
-            cv2.drawChessboardCorners(ec, PATTERN_SIZE, corners, retval)
-            cv2.imwrite(CORNER_PATH + "/" + image_name + "_corners.jpg", ec)
+            cv2.drawChessboardCorners(ec, PATTERN_SIZE, corners, retval)  # draw corners
+            cv2.imwrite(CORNER_PATH + "/" + image_name + ".jpg", ec)  # save to folder
             if corners.shape[0] == W_def.shape[0]:
                 correspondences.append([corners.astype(np.int), W_def[:, :-1].astype(np.int)])
             cnt += 1
@@ -36,4 +36,7 @@ def get_correspondence():
 
 
 if __name__ == "__main__":
-    get_correspondence()
+    correspondence = get_correspondence()
+    f = open("corners/correspondence.p", "wb")
+    pickle.dump(correspondence, f)
+    f.close()
