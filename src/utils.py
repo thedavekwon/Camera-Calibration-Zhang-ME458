@@ -1,10 +1,11 @@
 import glob
 # import cv2
-import numpy as np
 import pickle
+import numpy as np
+
+from scipy import optimize
 
 from constants import DATA_PATH, PATTERN_SIZE, SQUARE_SIZE, CORNER_PATH
-
 
 # def get_images():
 #     images = sorted(glob.glob(DATA_PATH + "/*.jpg"))
@@ -120,13 +121,58 @@ def get_extrinsic(H, A):
     # Find homogeneous transformation
     R_t = np.column_stack((R, t))
     return R_t
-      
+     
+     
+def proj_fun(initial_h, W, w, h, N):
+    W = W.reshape(N, 2)
+    projected = np.zeros((2*N, ), dtype=np.float64)
+    for i in range(N):
+        x, y = W[i]
+        w = h[6]*x + h[7]*y + h[8] 
+        # normalize by last element 
+        projected[2*i]   = (h[0]*x + h[1]*y + h[2]) / w
+        projected[2*i+1] = (h[3]*x + h[4]*y + h[5]) / w
+    # L2 Norm
+    return np.abs(projected-w)**2
+    
+    
+def jac_fun(initial_h, W, w, h, N):
+    W = W.reshape(N, 2)
+    jacobian = np.zeros((2*N, 9), np.float64)
+    for i in range(N):
+        x, y = W[i]
+        sx = np.float64(h[0]*x + h[1]*y + h[2])
+        sy = np.float64(h[3]*x + h[4]*y + h[5])
+        w = np.float64(h[6]*x + h[7]*y + h[8])
+        jacobian[2*i] = np.array([x/w, y/w, 1/w, 0, 0, 0, -sx*x/w**2, -sx*y/w**2, -sx/w**2])
+        jacobian[2*i + 1] = np.array([0, 0, 0, x/w, y/w, 1/w, -sy*x/w**2, -sy*y/w**2, -sy/w**2])
+    return jacobian
+    
+def MLE_optimize(H, W, w):
+    N = len(W)
+    W = W.flatten()
+    w = w.flatten()
+    h = H.flatten()
+    h_prime = optimize.least_squares(fun=proj_fun,
+                                     x0=h,
+                                     jac=jac_fun,
+                                     method="lm",
+                                     args=[W, w, h, N],
+                                     verbose=1)
+    if h_prime.success:
+        H = h_prime.x.reshape(3, 3)
+        H = H/H[2, 2]
+    return H
+
 
 if __name__ == "__main__":
     # correspondence = get_correspondence()
     correspondence = pickle.load(open("corners/correspondence.p", "rb"))
     Hs = get_homographys(correspondence)
-    A = get_intrinsic_parameter(Hs)
-    R_t = get_extrinsic(Hs[0], A)
+    Hs_refined = []
+    for H, (w, W) in zip(Hs, correspondence):
+        Hs_refined.append(MLE_optimize(H, W, w))
+    A = get_intrinsic_parameter(Hs_refined)
+    R_t = get_extrinsic(Hs_refined[0], A)
     print(A)
     print(R_t)
