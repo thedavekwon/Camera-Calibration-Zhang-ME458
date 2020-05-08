@@ -1,36 +1,37 @@
 import glob
-import cv2
+# import cv2
 import numpy as np
 import pickle
+
 from constants import DATA_PATH, PATTERN_SIZE, SQUARE_SIZE, CORNER_PATH
 
 
-def get_images():
-    images = sorted(glob.glob(DATA_PATH + "/*.jpg"))
-    for image in images:
-        yield image.split("/")[-1].split(".")[0], cv2.imread(image, 0)  # greyscale
+# def get_images():
+#     images = sorted(glob.glob(DATA_PATH + "/*.jpg"))
+#     for image in images:
+#         yield image.split("/")[-1].split(".")[0], cv2.imread(image, 0)  # greyscale
 
 
-def show_image(title, image):
-    cv2.imshow(title, image)
-    cv2.waitKey()
+# def show_image(title, image):
+#     cv2.imshow(title, image)
+#     cv2.waitKey()
 
 
-def get_correspondence():
-    W_def = np.zeros((PATTERN_SIZE[0] * PATTERN_SIZE[1], 3), dtype=np.float64)  # World Coordinate
-    W_def[:, :2] = np.indices(PATTERN_SIZE).T.reshape(-1, 2) * SQUARE_SIZE
-    correspondences = []
-    for image_name, image in get_images():
-        retval, corners = cv2.findChessboardCorners(image, patternSize=PATTERN_SIZE)
-        # detected
-        if retval:
-            corners = corners.reshape(-1, 2)  # image coordinmate
-            ec = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
-            cv2.drawChessboardCorners(ec, PATTERN_SIZE, corners, retval)  # draw corners
-            cv2.imwrite(CORNER_PATH + "/" + image_name + ".jpg", ec)  # save to folder
-            if corners.shape[0] == W_def.shape[0]:
-                correspondences.append([corners.astype(np.int), W_def[:, :-1].astype(np.float64)])
-    return correspondences
+# def get_correspondence():
+#     W_def = np.zeros((PATTERN_SIZE[0] * PATTERN_SIZE[1], 3), dtype=np.float64)  # World Coordinate
+#     W_def[:, :2] = np.indices(PATTERN_SIZE).T.reshape(-1, 2) * SQUARE_SIZE
+#     correspondences = []
+#     for image_name, image in get_images():
+#         retval, corners = cv2.findChessboardCorners(image, patternSize=PATTERN_SIZE)
+#         # detected
+#         if retval:
+#             corners = corners.reshape(-1, 2)  # image coordinmate
+#             ec = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+#             cv2.drawChessboardCorners(ec, PATTERN_SIZE, corners, retval)  # draw corners
+#             cv2.imwrite(CORNER_PATH + "/" + image_name + ".jpg", ec)  # save to folder
+#             if corners.shape[0] == W_def.shape[0]:
+#                 correspondences.append([corners.astype(np.int), W_def[:, :-1].astype(np.float64)])
+#     return correspondences
 
 
 # DLT method requires normalized matrix
@@ -99,34 +100,31 @@ def get_extrinsic(H, A):
     # Get the homography and intrinsic parameters
     inv_A = np.linalg.inv(A)
     # Get each column of the homography
-    h_1 = H[:,0]
-    h_2 = H[:,1]
-    h_3 = H[:,2]
+    h_1 = H[:, 0]
+    h_2 = H[:, 1]
+    h_3 = H[:, 2]
     # Get the (average) scale factor
-    lamb_1 = 1/(np.linalg.norm(np.dot(inv_A,h_1)))
-    lamb_2 = 1/(np.linalg.norm(np.dot(inv_A,h_2)))
-    lamb = (lamb_1+lamb_2)/2
+    lamb_1 = 1/(np.linalg.norm(np.dot(inv_A, h_1)))
+    lamb_2 = 1/(np.linalg.norm(np.dot(inv_A, h_2)))
+    lamb = (lamb_1 + lamb_2)/2
     # Find rotation matrix
-    r_1 = lamb*np.dot(inv_A,h_1)
-    r_2 = lamb*np.dot(inv_A,h_2)
-    r_3 = np.cross(r_1,r_2)
-    R = np.column_stack((r_1,r_2,r_3))
+    r_1 = lamb*np.dot(inv_A, h_1)
+    r_2 = lamb*np.dot(inv_A, h_2)
+    r_3 = np.cross(r_1, r_2)
+    R = np.column_stack((r_1, r_2, r_3))
     # Enforce orthogonal matrix
     u,_,v = np.linalg.svd(R)
     R = np.dot(u,np.transpose(v))
     # Find translation
-    t = lamb*np.dot(inv_A,h_3)
+    t = lamb*np.dot(inv_A, h_3)
     # Find homogeneous transformation
-    R_t = np.column_stack((R,t))
+    R_t = np.column_stack((R, t))
     return R_t
       
-    
-    
-
-
 
 if __name__ == "__main__":
-    correspondence = get_correspondence()
+    # correspondence = get_correspondence()
+    correspondence = pickle.load(open("corners/correspondence.p", "rb"))
     Hs = get_homographys(correspondence)
     A = get_intrinsic_parameter(Hs)
     R_t = get_extrinsic(Hs[0], A)
