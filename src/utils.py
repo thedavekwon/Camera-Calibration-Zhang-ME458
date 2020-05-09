@@ -133,6 +133,7 @@ def proj_fun(initial_h, W, w, h, N):
     return projected-w
     
     
+# http://staff.fh-hagenberg.at/burger/publications/reports/2016Calibration/Burger-CameraCalibration-20160516.pdf
 def jac_fun(initial_h, W, w, h, N):
     W = W.reshape(N, 2)
     jacobian = np.zeros((2*N, 9), np.float64)
@@ -193,19 +194,3 @@ def estimated_lens_distortion(A, Hs, correspondence):
             d[2*(i*len(W)+j)+1] = v_dot - v
     k = np.matmul(np.linalg.inv(np.matmul(D.T, D)), np.matmul(D.T, d))
     return k
-
-if __name__ == "__main__":
-    correspondence = get_correspondence()  # N images x [48 World coord, 48 image coord] 
-    # correspondence = pickle.load(open("corners/correspondence.p", "rb"))
-    Hs = get_homographys(correspondence)
-    Hs_refined = []
-    for H, (w, W) in zip(Hs, correspondence):
-        Hs_refined.append(MLE_HOM_optimize(H, W, w))
-    print(Hs[0] == Hs_refined[0])
-    A = get_intrinsic_parameter(Hs_refined)
-    k1, k2 = estimated_lens_distortion(A, Hs_refined, correspondence)
-    print(k1)
-    print(k2)
-    print(A)
-    # A_prime = get_intrinsic_parameter(Hs)
-
